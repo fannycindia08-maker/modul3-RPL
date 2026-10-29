@@ -5,28 +5,28 @@ from views.anggota_view import AnggotaView
 
 
 class AnggotaController:
-    def __init__(self):ds
+    def __init__(self):
         self.model = AnggotaModel()
         self.view = AnggotaView()
 
-        # Binding tombol
+        # Hubungkan tombol dengan fungsi
         self.view.btn_simpan.configure(
             command=self.simpan_data
         )
         self.view.btn_update.configure(
-            command=self.update_data
+            command=self.perbarui_data
         )
         self.view.btn_delete.configure(
             command=self.hapus_data
         )
 
-        # Mengisi form saat baris tabel diklik
+        # Event ketika baris tabel dipilih
         self.view.tabel.bind(
             "<<TreeviewSelect>>",
-            self.pilih_anggota
+            self.isi_form_dari_tabel
         )
 
-        # Muat data saat aplikasi dibuka
+        # Tampilkan data saat program dibuka
         self.muat_data_tabel()
 
     def muat_data_tabel(self):
@@ -41,41 +41,57 @@ class AnggotaController:
                 "end",
                 values=(
                     anggota["id_anggota"],
-                    anggota["nama_anggota"],
-                    anggota["alamat"]
+                    anggota["nama"],
+                    anggota["alamat"] or ""
                 )
             )
 
-    def pilih_anggota(self, event=None):
-        pilihan = self.view.tabel.selection()
+    def bersihkan_form(self):
+        self.view.entry_nama.delete(0, "end")
+        self.view.entry_alamat.delete(0, "end")
 
-        if not pilihan:
-            return
+        for item in self.view.tabel.selection():
+            self.view.tabel.selection_remove(item)
 
-        data = self.view.tabel.item(
-            pilihan[0], "values"
-        )
-
-        self.bersihkan_form()
-
-        self.view.entry_nama.insert(0, data[1])
-        self.view.entry_alamat.insert(0, data[2])
-
-    def ambil_id_anggota(self):
+    def get_id_terpilih(self):
         pilihan = self.view.tabel.selection()
 
         if not pilihan:
             messagebox.showwarning(
                 "Peringatan",
-                "Pilih data anggota terlebih dahulu!"
+                "Pilih baris anggota di tabel terlebih dahulu!"
             )
             return None
 
-        data = self.view.tabel.item(
+        values = self.view.tabel.item(
             pilihan[0], "values"
         )
 
-        return data[0]
+        if not values:
+            return None
+
+        return values[0]
+
+    def isi_form_dari_tabel(self, event=None):
+        pilihan = self.view.tabel.selection()
+
+        if not pilihan:
+            return
+
+        values = self.view.tabel.item(
+            pilihan[0], "values"
+        )
+
+        if len(values) < 3:
+            return
+
+        _, nama, alamat = values
+
+        self.view.entry_nama.delete(0, "end")
+        self.view.entry_nama.insert(0, nama)
+
+        self.view.entry_alamat.delete(0, "end")
+        self.view.entry_alamat.insert(0, alamat)
 
     def simpan_data(self):
         nama = self.view.entry_nama.get().strip()
@@ -84,16 +100,11 @@ class AnggotaController:
         if not nama or not alamat:
             messagebox.showwarning(
                 "Peringatan",
-                "Semua kolom form harus diisi!"
+                "Nama dan alamat wajib diisi!"
             )
             return
 
-        # Sesuaikan dengan nama method di AnggotaModel
-        berhasil = self.model.tambah_anggota(
-            nama, alamat
-        )
-
-        if berhasil:
+        if self.model.create_anggota(nama, alamat):
             messagebox.showinfo(
                 "Sukses",
                 "Data anggota berhasil disimpan!"
@@ -103,11 +114,11 @@ class AnggotaController:
         else:
             messagebox.showerror(
                 "Error",
-                "Data anggota gagal disimpan."
+                "Data gagal disimpan. Periksa pesan error di terminal."
             )
 
-    def update_data(self):
-        id_anggota = self.ambil_id_anggota()
+    def perbarui_data(self):
+        id_anggota = self.get_id_terpilih()
 
         if id_anggota is None:
             return
@@ -118,16 +129,13 @@ class AnggotaController:
         if not nama or not alamat:
             messagebox.showwarning(
                 "Peringatan",
-                "Semua kolom form harus diisi!"
+                "Nama dan alamat wajib diisi!"
             )
             return
 
-        # Sesuaikan dengan method di AnggotaModel
-        berhasil = self.model.update_anggota(
+        if self.model.update_anggota(
             id_anggota, nama, alamat
-        )
-
-        if berhasil:
+        ):
             messagebox.showinfo(
                 "Sukses",
                 "Data anggota berhasil diperbarui!"
@@ -137,29 +145,24 @@ class AnggotaController:
         else:
             messagebox.showerror(
                 "Error",
-                "Data anggota gagal diperbarui."
+                "Data gagal diperbarui. Periksa pesan error di terminal."
             )
 
     def hapus_data(self):
-        id_anggota = self.ambil_id_anggota()
+        id_anggota = self.get_id_terpilih()
 
         if id_anggota is None:
             return
 
         konfirmasi = messagebox.askyesno(
             "Konfirmasi",
-            "Apakah kamu yakin ingin menghapus anggota ini?"
+            "Yakin ingin menghapus data anggota ini?"
         )
 
         if not konfirmasi:
             return
 
-        # Sesuaikan dengan method di AnggotaModel
-        berhasil = self.model.hapus_anggota(
-            id_anggota
-        )
-
-        if berhasil:
+        if self.model.delete_anggota(id_anggota):
             messagebox.showinfo(
                 "Sukses",
                 "Data anggota berhasil dihapus!"
@@ -169,12 +172,13 @@ class AnggotaController:
         else:
             messagebox.showerror(
                 "Error",
-                "Data anggota gagal dihapus."
+                "Data gagal dihapus. Periksa pesan error di terminal."
             )
-
-    def bersihkan_form(self):
-        self.view.entry_nama.delete(0, "end")
-        self.view.entry_alamat.delete(0, "end")
 
     def run(self):
         self.view.mainloop()
+
+
+if __name__ == "__main__":
+    app = AnggotaController()
+    app.run()
